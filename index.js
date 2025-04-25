@@ -343,39 +343,116 @@ function generateBarChartCustomerRetention(data) {
 }
 
 
-// Función para generar el gráfico de barras de ventas por región
+// // Función para generar el gráfico de barras de ventas por región
+// function generateBarChartSalesByRegion(data) {
+//   // Agrupar por región y sumar ventas
+//   const ventasPorRegion = d3.rollups(
+//       data,
+//       v => d3.sum(v, d => +d['Quantity Sold']),
+//       d => d['Region']
+//   ).map(([region, total]) => ({ region, total }));
+
+//   // Dimensiones
+//   const margin = { top: 40, right: 30, bottom: 100, left: 60 },
+//         width = 800 - margin.left - margin.right,
+//         height = 400 - margin.top - margin.bottom;
+
+//   const svg = d3.select("#grafico-region")
+//       .html("") // limpiar gráfico anterior
+//       .append("svg")
+//       .attr("width", width + margin.left + margin.right)
+//       .attr("height", height + margin.top + margin.bottom)
+//       .append("g")
+//       .attr("transform", `translate(${margin.left},${margin.top})`);
+
+//   // Escalas
+//   const x = d3.scaleBand()
+//       .domain(ventasPorRegion.map(d => d.region))
+//       .range([0, width])
+//       .padding(0.2);
+
+//   const y = d3.scaleLinear()
+//       .domain([0, d3.max(ventasPorRegion, d => d.total)]).nice()
+//       .range([height, 0]);
+
+//   // Ejes
+//   svg.append("g")
+//       .attr("transform", `translate(0,${height})`)
+//       .call(d3.axisBottom(x))
+//       .selectAll("text")
+//       .attr("transform", "rotate(-40)")
+//       .style("text-anchor", "end");
+
+//   svg.append("g")
+//       .call(d3.axisLeft(y));
+
+//   // Barras verticales
+//   svg.selectAll("rect")
+//       .data(ventasPorRegion)
+//       .enter()
+//       .append("rect")
+//       .attr("x", d => x(d.region))
+//       .attr("y", d => y(d.total))
+//       .attr("width", x.bandwidth())
+//       .attr("height", d => height - y(d.total))
+//       .attr("fill", "#69b3a2");
+
+//   // Etiquetas encima de cada barra
+//   svg.selectAll(".label")
+//       .data(ventasPorRegion)
+//       .enter()
+//       .append("text")
+//       .attr("x", d => x(d.region) + x.bandwidth() / 2)
+//       .attr("y", d => y(d.total) - 5)
+//       .attr("text-anchor", "middle")
+//       .style("font-size", "12px")
+//       .text(d => d.total);
+
+//   // Título
+//   svg.append("text")
+//       .attr("x", width / 2)
+//       .attr("y", -15)
+//       .attr("text-anchor", "middle")
+//       .style("font-size", "16px")
+//       .text("Ventas por Región");
+// }
+
+
+
 function generateBarChartSalesByRegion(data) {
-  // Agrupar por región y sumar ventas
+  // Agrupar por región y sumar el total vendido en dinero (Total_sale)
   const ventasPorRegion = d3.rollups(
       data,
-      v => d3.sum(v, d => +d['Quantity Sold']),
-      d => d['Region']
+      v => d3.sum(v, d => +d.Total_sale), // ← usamos la columna 'Total_sale'
+      d => d.Region
   ).map(([region, total]) => ({ region, total }));
 
-  // Dimensiones
+  // Dimensiones del gráfico
   const margin = { top: 40, right: 30, bottom: 100, left: 60 },
         width = 800 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
+  // Crear el SVG
   const svg = d3.select("#grafico-region")
-      .html("") // limpiar gráfico anterior
+      .html("") // Limpiar cualquier gráfico anterior
       .append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height + margin.top + margin.bottom)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Escalas
+  // Escala X (categorías - regiones)
   const x = d3.scaleBand()
       .domain(ventasPorRegion.map(d => d.region))
       .range([0, width])
       .padding(0.2);
 
+  // Escala Y (valores en dinero)
   const y = d3.scaleLinear()
       .domain([0, d3.max(ventasPorRegion, d => d.total)]).nice()
       .range([height, 0]);
 
-  // Ejes
+  // Eje X
   svg.append("g")
       .attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x))
@@ -383,10 +460,11 @@ function generateBarChartSalesByRegion(data) {
       .attr("transform", "rotate(-40)")
       .style("text-anchor", "end");
 
+  // Eje Y
   svg.append("g")
-      .call(d3.axisLeft(y));
+      .call(d3.axisLeft(y).ticks(6));
 
-  // Barras verticales
+  // Dibujar las barras
   svg.selectAll("rect")
       .data(ventasPorRegion)
       .enter()
@@ -397,7 +475,7 @@ function generateBarChartSalesByRegion(data) {
       .attr("height", d => height - y(d.total))
       .attr("fill", "#69b3a2");
 
-  // Etiquetas encima de cada barra
+  // Agregar etiquetas con el valor monetario formateado
   svg.selectAll(".label")
       .data(ventasPorRegion)
       .enter()
@@ -406,16 +484,17 @@ function generateBarChartSalesByRegion(data) {
       .attr("y", d => y(d.total) - 5)
       .attr("text-anchor", "middle")
       .style("font-size", "12px")
-      .text(d => d.total);
+      .text(d => `$${formatValue(d.total)}`);
 
-  // Título
+  // Título del gráfico
   svg.append("text")
       .attr("x", width / 2)
       .attr("y", -15)
       .attr("text-anchor", "middle")
       .style("font-size", "16px")
-      .text("Ventas por Región");
+      .text("Total Vendido por Región ($)");
 }
+
 
 
 
