@@ -342,6 +342,81 @@ function generateBarChartCustomerRetention(data) {
       .text("Clientes Más Frecuentes (Fidelización)");
 }
 
+// Función para generar el gráfico de barras de top de lugares de compradores
+function generateBarChartCustomerLocationTop(data) {
+  // Agrupar por lugar y contar compras
+  const comprasPorLocation = d3.rollups(
+      data,
+      v => v.length,
+      d => d['Customer Location']
+  ).map(([location, total]) => ({ location, total }));
+
+  // Ordenar y seleccionar los 15 lugares con más compras
+  const topLocation = comprasPorLocation
+      .sort((a, b) => d3.descending(a.total, b.total))
+      .slice(0, 15);
+  
+  //Dimensiones del gráfico
+  const margin = { top: 40, right: 40, bottom: 40, left: 200 },
+        width = 700 - margin.left - margin.right,
+        height = topLocation.length * 30;
+
+  // Crear el SVG
+  const svg = d3.select("#grafico-location")
+      .html("")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  // Escalas
+  const y = d3.scaleBand()
+      .domain(topLocation.map(d => d.location))
+      .range([0, height])
+      .padding(0.1);
+
+  const x = d3.scaleLinear()
+      .domain([0, d3.max(topLocation, d => d.total)]).nice()
+      .range([0, width]);
+
+  // Ejes
+  svg.append("g").call(d3.axisLeft(y));
+
+  svg.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x).ticks(5));
+
+  // Barras horizontales
+  svg.selectAll("rect")
+      .data(topLocation)
+      .enter()
+      .append("rect")
+      .attr("y", d => y(d.location))
+      .attr("x", 0)
+      .attr("height", y.bandwidth())
+      .attr("width", d => x(d.total))
+      .attr("fill", "#D3D3D3");
+
+  // Etiquetas al final de cada barra
+  svg.selectAll(".label")
+      .data(topLocation)
+      .enter()
+      .append("text")
+      .attr("x", d => x(d.total) + 5)
+      .attr("y", d => y(d.location) + y.bandwidth() / 2 + 5)
+      .text(d => d.total)
+      .style("font-size", "12px");
+
+  // Título centrado
+  svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", -15)
+      .attr("text-anchor", "middle")
+      .style("font-size", "16px")
+      .text("Top 15 Lugares de compra");
+}
+
 
 // // Función para generar el gráfico de barras de ventas por región
 // function generateBarChartSalesByRegion(data) {
@@ -671,6 +746,10 @@ getData().then(() => {
 
 getData().then(() => {
   generateBarChartTopLaptops(dataset_global);
+});
+
+getData().then(() => {
+  generateBarChartCustomerLocationTop(dataset_global);
 });
 
 
