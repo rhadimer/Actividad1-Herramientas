@@ -651,6 +651,94 @@ function generateBarChartTopMobilePhones(data) {
 }
 
 
+// Función para generar el gráfico de pastel de las 5 marcas más vendidas de móviles
+function generatePieChartTopMobilePhones(data) {
+  // Filtrar solo productos tipo "Mobile Phone"
+  const filtrados = data.filter(d => d.Product === "Mobile Phone");
+
+  // Agrupar por marca y sumar Total_sale
+  const ventasPorMarca = d3.rollups(
+      filtrados,
+      v => d3.sum(v, d => +d.Total_sale),
+      d => d.Brand
+  ).map(([brand, total]) => ({ brand, total }));
+
+  // Ordenar descendente y tomar el top 5
+  const top = ventasPorMarca.sort((a, b) => d3.descending(a.total, b.total)).slice(0, 5);
+
+  // Dimensiones
+  const width = 500;
+  const height = 500;
+  const radius = Math.min(width, height) / 2 - 50;
+
+  // Crear el SVG
+  const svg = d3.select("#grafico-top-mobiles")
+      .html("")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(${width / 2},${height / 2})`);
+
+  // Colores
+  const color = d3.scaleOrdinal()
+      .domain(top.map(d => d.brand))
+      .range(d3.schemeCategory10);
+
+  // Generador de pie
+  const pie = d3.pie()
+      .value(d => d.total)
+      .sort(null);
+
+  // Generador de arcos
+  const arc = d3.arc()
+      .innerRadius(0)
+      .outerRadius(radius);
+
+  // Animación: arco inicial (radio 0)
+  const arcTween = (d) => {
+      const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
+      return function(t) {
+          return arc(i(t));
+      };
+  };
+
+  // Dibujar las rebanadas (slices)
+  svg.selectAll("path")
+      .data(pie(top))
+      .enter()
+      .append("path")
+      .attr("fill", d => color(d.data.brand))
+      .transition()
+      .duration(1500)
+      .attrTween("d", arcTween);
+
+  // Añadir etiquetas (nombre + valor) con letras blancas
+  svg.selectAll("text")
+      .data(pie(top))
+      .enter()
+      .append("text")
+      .transition()
+      .delay(800)
+      .duration(1000)
+      .attr("transform", d => `translate(${arc.centroid(d)})`)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "white") // Letras blancas
+      .text(d => `${d.data.brand}: ${formatValue(d.data.total)}`);
+
+  // Título
+  d3.select("#grafico-top-mobiles svg")
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", 20)
+      .attr("text-anchor", "middle")
+      .style("font-size", "16px")
+      .text("Top 5 Marcas Mobile - Total Vendido ($)");
+}
+
+
+
 
 // funcion para generar el gráfico de barras de las 5 marcas más vendidas de laptops
 function generateBarChartTopLaptops(data) {
@@ -758,6 +846,93 @@ function generateBarChartTopLaptops(data) {
 }
 
 
+//funcion para generar el gráfico de pastel de las 5 marcas más vendidas de laptops
+function generatePieChartTopLaptops(data) {
+  // Filtrar productos tipo "Laptop"
+  const filtrados = data.filter(d => d.Product === "Laptop");
+
+  // Agrupar por marca y sumar Total_sale
+  const ventasPorMarca = d3.rollups(
+      filtrados,
+      v => d3.sum(v, d => +d.Total_sale),
+      d => d.Brand
+  ).map(([brand, total]) => ({ brand, total }));
+
+  // Ordenar descendente y tomar el top 5
+  const top = ventasPorMarca.sort((a, b) => d3.descending(a.total, b.total)).slice(0, 5);
+
+  // Dimensiones
+  const width = 500;
+  const height = 500;
+  const radius = Math.min(width, height) / 2 - 50;
+
+  // Crear el SVG
+  const svg = d3.select("#grafico-top-laptops")
+      .html("")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(${width / 2},${height / 2})`);
+
+  // Colores
+  const color = d3.scaleOrdinal()
+      .domain(top.map(d => d.brand))
+      .range(d3.schemeCategory10);
+
+  // Generador de pie
+  const pie = d3.pie()
+      .value(d => d.total)
+      .sort(null);
+
+  // Generador de arcos
+  const arc = d3.arc()
+      .innerRadius(0)
+      .outerRadius(radius);
+
+  // Animación: arco inicial (radio 0)
+  const arcTween = (d) => {
+      const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
+      return function(t) {
+          return arc(i(t));
+      };
+  };
+
+  // Dibujar las rebanadas
+  svg.selectAll("path")
+      .data(pie(top))
+      .enter()
+      .append("path")
+      .attr("fill", d => color(d.data.brand))
+      .transition()
+      .duration(1500)
+      .attrTween("d", arcTween);
+
+  // Añadir etiquetas (con letras blancas ahora)
+  svg.selectAll("text")
+      .data(pie(top))
+      .enter()
+      .append("text")
+      .transition()
+      .delay(800)
+      .duration(1000)
+      .attr("transform", d => `translate(${arc.centroid(d)})`)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "white") // Letras blancas
+      .text(d => `${d.data.brand}: ${formatValue(d.data.total)}`);
+
+  // Título
+  d3.select("#grafico-top-laptops svg")
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", 20)
+      .attr("text-anchor", "middle")
+      .style("font-size", "16px")
+      .text("Top 5 Marcas Laptop - Total Vendido ($)");
+}
+
+
 
 // Llamar a la función después de cargar los datos
 
@@ -780,14 +955,24 @@ getData().then(() => {
 });
 
 
-getData().then(() => {
-  generateBarChartTopMobilePhones(dataset_global);
-});
+// getData().then(() => {
+//   generateBarChartTopMobilePhones(dataset_global);
+// });
 
 
 getData().then(() => {
   generateBarChartTopLaptops(dataset_global);
 });
+
+
+getData().then(() => {
+  generatePieChartTopMobilePhones(dataset_global);
+});
+
+// getData().then(() => {
+//   generatePieChartTopLaptops(dataset_global);
+// });
+
 
 getData().then(() => {
   generateBarChartCustomerLocationTop(dataset_global);
