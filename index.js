@@ -68,6 +68,23 @@ async function getData() {
         return typeof value === 'number' && !isNaN(value) ? y(value) : y(0); // Manejo robusto de valores no numéricos
       });
   
+    // products.forEach(function(product, index) {
+    //   const lineGenerator = d3.line()
+    //     .x(d => x(d.Date))
+    //     .y(d => {
+    //       const value = d[product];
+    //       return typeof value === 'number' && !isNaN(value) ? y(value) : y(0); // Manejo robusto de valores no numéricos
+    //     });
+  
+    //   g.append("path")
+    //     .datum(monthlySalesArray)
+    //     .attr("fill", "none")
+    //     .attr("stroke", colors(product))
+    //     .attr("stroke-width", 1.5)
+    //     .attr("d", lineGenerator)
+    //     .attr("class", "line");
+    // });
+
     products.forEach(function(product, index) {
       const lineGenerator = d3.line()
         .x(d => x(d.Date))
@@ -75,14 +92,25 @@ async function getData() {
           const value = d[product];
           return typeof value === 'number' && !isNaN(value) ? y(value) : y(0); // Manejo robusto de valores no numéricos
         });
-  
-      g.append("path")
+    
+      const path = g.append("path")
         .datum(monthlySalesArray)
         .attr("fill", "none")
         .attr("stroke", colors(product))
-        .attr("stroke-width", 1.5)
+        .attr("stroke-width", 2)
         .attr("d", lineGenerator)
         .attr("class", "line");
+    
+      //Animación: que la línea se dibuje progresivamente
+      const totalLength = path.node().getTotalLength();
+    
+      path
+        .attr("stroke-dasharray", totalLength + " " + totalLength) // Definimos el dash
+        .attr("stroke-dashoffset", totalLength) // Inicialmente oculto
+        .transition()
+        .duration(2000) // Duración de 2 segundos
+        .ease(d3.easeLinear)
+        .attr("stroke-dashoffset", 0); // Se va "dibujando"
     });
   
     g.append("g")
@@ -197,79 +225,7 @@ function generateDonutChartProductTypes(data) {
 
 
 
-
-// Función para generar el gráfico de líneas de tendencia de ventas
-// Se espera que el dataset tenga una columna 'Dispatch Date' con la fecha de despacho
-// y una columna 'Quantity Sold' con la cantidad vendida
-// Se agrupará por mes y se sumará la cantidad vendida para cada mes
-function generateLineChartSalesTrend(data) {
-  // Parsear la fecha
-  const parseDate = d3.timeParse("%Y-%m-%d");
-  data.forEach(d => d.DispatchDate = parseDate(d['Dispatch Date']));
-
-  // Agrupar por mes y sumar cantidad vendida
-  const ventasPorMes = d3.rollup(
-      data,
-      v => d3.sum(v, d => +d['Quantity Sold']),
-      d => d3.timeMonth(d.DispatchDate)
-  );
-
-  // Convertir a array para graficar
-  const ventas = Array.from(ventasPorMes, ([fecha, total]) => ({ fecha, total }));
-
-  // Dimensiones
-  const margin = { top: 40, right: 30, bottom: 50, left: 60 };
-  const width = 800 - margin.left - margin.right;
-  const height = 400 - margin.top - margin.bottom;
-
-  // Crear SVG
-  const svg = d3.select("#ventas-tendencia")
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-
-  // Escalas
-  const x = d3.scaleTime()
-      .domain(d3.extent(ventas, d => d.fecha))
-      .range([0, width]);
-
-  const y = d3.scaleLinear()
-      .domain([0, d3.max(ventas, d => d.total)]).nice()
-      .range([height, 0]);
-
-  // Ejes
-  svg.append("g")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickFormat(d3.timeFormat("%b %Y")))
-      .selectAll("text")
-      .attr("transform", "rotate(-45)")
-      .style("text-anchor", "end");
-
-  svg.append("g").call(d3.axisLeft(y));
-
-  // Línea
-  svg.append("path")
-      .datum(ventas)
-      .attr("fill", "none")
-      .attr("stroke", "steelblue")
-      .attr("stroke-width", 2)
-      .attr("d", d3.line()
-          .x(d => x(d.fecha))
-          .y(d => y(d.total))
-      );
-
-  // Título
-  svg.append("text")
-      .attr("x", width / 2)
-      .attr("y", -10)
-      .attr("text-anchor", "middle")
-      .style("font-size", "16px")
-      .text("Tendencia de Ventas por Mes");
-}
-
-// Función para generar el gráfico de barras de retención de clientes
+//funcion para generar el gráfico de barras de fidelización de clientes
 function generateBarChartCustomerRetention(data) {
   // Agrupar por cliente y contar compras
   const comprasPorCliente = d3.rollups(
@@ -278,10 +234,13 @@ function generateBarChartCustomerRetention(data) {
       d => d['Customer Name']
   ).map(([cliente, total]) => ({ cliente, total }));
 
-  // Ordenar y seleccionar los 15 con más compras
+  // Ordenar y seleccionar los 15 más fieles
   const topClientes = comprasPorCliente
       .sort((a, b) => d3.descending(a.total, b.total))
       .slice(0, 15);
+
+  // Detectar el valor máximo (cliente con más compras)
+  const maxTotal = d3.max(topClientes, d => d.total);
 
   const margin = { top: 40, right: 40, bottom: 40, left: 200 },
         width = 800 - margin.left - margin.right,
@@ -307,12 +266,11 @@ function generateBarChartCustomerRetention(data) {
 
   // Ejes
   svg.append("g").call(d3.axisLeft(y));
-
   svg.append("g")
       .attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(5));
 
-  // Barras horizontales
+  // Barras horizontales con animación y color especial para el máximo
   svg.selectAll("rect")
       .data(topClientes)
       .enter()
@@ -320,18 +278,45 @@ function generateBarChartCustomerRetention(data) {
       .attr("y", d => y(d.cliente))
       .attr("x", 0)
       .attr("height", y.bandwidth())
-      .attr("width", d => x(d.total))
-      .attr("fill", "#1f77b4");
+      .attr("width", 0) // Ancho inicial 0 para la animación
+      .attr("fill", d => d.total === maxTotal ? "#2f4f4f" : "#1f77b4") // Más oscuro si es máximo
+      .on("mouseover", function(event, d) {
+          if (d.total !== maxTotal) { // Solo barras normales cambian color
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#4682B4");
+          }
+      })
+      .on("mouseout", function(event, d) {
+          if (d.total !== maxTotal) { // Solo barras normales regresan al color original
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#1f77b4");
+          }
+      })
+      .transition()
+      .duration(1200)
+      .ease(d3.easeBounceOut)
+      .attr("width", d => x(d.total));
 
-  // Etiquetas al final de cada barra
-  svg.selectAll(".label")
+  // Etiquetas de cantidad
+  svg.selectAll("text.label")
       .data(topClientes)
       .enter()
       .append("text")
-      .attr("x", d => x(d.total) + 5)
+      .attr("x", 0)
       .attr("y", d => y(d.cliente) + y.bandwidth() / 2 + 5)
       .text(d => d.total)
-      .style("font-size", "12px");
+      .style("font-size", "12px")
+      .style("opacity", 0)
+      .transition()
+      .duration(1200)
+      .delay(400)
+      .ease(d3.easeBounceOut)
+      .attr("x", d => x(d.total) + 5)
+      .style("opacity", 1);
 
   // Título centrado
   svg.append("text")
@@ -342,7 +327,8 @@ function generateBarChartCustomerRetention(data) {
       .text("Clientes Más Frecuentes (Fidelización)");
 }
 
-// Función para generar el gráfico de barras de top de lugares de compradores
+
+// Función para generar el gráfico de barras de los 15 lugares de compra más frecuentes
 function generateBarChartCustomerLocationTop(data) {
   // Agrupar por lugar y contar compras
   const comprasPorLocation = d3.rollups(
@@ -355,8 +341,11 @@ function generateBarChartCustomerLocationTop(data) {
   const topLocation = comprasPorLocation
       .sort((a, b) => d3.descending(a.total, b.total))
       .slice(0, 15);
-  
-  //Dimensiones del gráfico
+
+  // Identificar el valor máximo
+  const maxTotal = d3.max(topLocation, d => d.total);
+
+  // Dimensiones del gráfico
   const margin = { top: 40, right: 40, bottom: 40, left: 200 },
         width = 700 - margin.left - margin.right,
         height = topLocation.length * 30;
@@ -377,17 +366,16 @@ function generateBarChartCustomerLocationTop(data) {
       .padding(0.1);
 
   const x = d3.scaleLinear()
-      .domain([0, d3.max(topLocation, d => d.total)]).nice()
+      .domain([0, maxTotal]).nice()
       .range([0, width]);
 
   // Ejes
   svg.append("g").call(d3.axisLeft(y));
-
   svg.append("g")
       .attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(5));
 
-  // Barras horizontales
+  // Barras horizontales con color especial para el máximo
   svg.selectAll("rect")
       .data(topLocation)
       .enter()
@@ -395,18 +383,45 @@ function generateBarChartCustomerLocationTop(data) {
       .attr("y", d => y(d.location))
       .attr("x", 0)
       .attr("height", y.bandwidth())
-      .attr("width", d => x(d.total))
-      .attr("fill", "#D3D3D3");
+      .attr("width", 0) // Inicialmente ancho 0
+      .attr("fill", d => d.total === maxTotal ? "#696969" : "#D3D3D3") // Oscuro para el máximo
+      .on("mouseover", function(event, d) {
+          if (d.total !== maxTotal) { // Solo barras que NO son máximas
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#A9A9A9");
+          }
+      })
+      .on("mouseout", function(event, d) {
+          if (d.total !== maxTotal) { // Solo barras que NO son máximas
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#D3D3D3");
+          }
+      })
+      .transition()
+      .duration(1200)
+      .ease(d3.easeBounceOut)
+      .attr("width", d => x(d.total));
 
-  // Etiquetas al final de cada barra
-  svg.selectAll(".label")
+  // Etiquetas de cantidad al final de cada barra
+  svg.selectAll("text.label")
       .data(topLocation)
       .enter()
       .append("text")
-      .attr("x", d => x(d.total) + 5)
+      .attr("x", 0)
       .attr("y", d => y(d.location) + y.bandwidth() / 2 + 5)
       .text(d => d.total)
-      .style("font-size", "12px");
+      .style("font-size", "12px")
+      .style("opacity", 0)
+      .transition()
+      .duration(1200)
+      .delay(400)
+      .ease(d3.easeBounceOut)
+      .attr("x", d => x(d.total) + 5)
+      .style("opacity", 1);
 
   // Título centrado
   svg.append("text")
@@ -414,17 +429,23 @@ function generateBarChartCustomerLocationTop(data) {
       .attr("y", -15)
       .attr("text-anchor", "middle")
       .style("font-size", "16px")
-      .text("Top 15 Lugares de compra");
+      .text("Top 15 Lugares de Compra");
 }
 
 
+
+
+// Función para generar el gráfico de barras de ventas por región
 function generateBarChartSalesByRegion(data) {
   // Agrupar por región y sumar el total vendido en dinero (Total_sale)
   const ventasPorRegion = d3.rollups(
       data,
-      v => d3.sum(v, d => +d.Total_sale), // ← usamos la columna 'Total_sale'
+      v => d3.sum(v, d => +d.Total_sale),
       d => d.Region
   ).map(([region, total]) => ({ region, total }));
+
+  // Detectar el valor máximo
+  const maxTotal = d3.max(ventasPorRegion, d => d.total);
 
   // Dimensiones del gráfico
   const margin = { top: 40, right: 30, bottom: 100, left: 60 },
@@ -433,22 +454,22 @@ function generateBarChartSalesByRegion(data) {
 
   // Crear el SVG
   const svg = d3.select("#grafico-region")
-      .html("") // Limpiar cualquier gráfico anterior
+      .html("") // Limpiar anterior
       .append("svg")
       .attr("width", width + margin.left + margin.right)
       .attr("height", height + margin.top + margin.bottom)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Escala X (categorías - regiones)
+  // Escala X (regiones)
   const x = d3.scaleBand()
       .domain(ventasPorRegion.map(d => d.region))
       .range([0, width])
       .padding(0.2);
 
-  // Escala Y (valores en dinero)
+  // Escala Y (valores)
   const y = d3.scaleLinear()
-      .domain([0, d3.max(ventasPorRegion, d => d.total)]).nice()
+      .domain([0, maxTotal]).nice()
       .range([height, 0]);
 
   // Eje X
@@ -463,27 +484,55 @@ function generateBarChartSalesByRegion(data) {
   svg.append("g")
       .call(d3.axisLeft(y).ticks(6));
 
-  // Dibujar las barras
+  // Dibujar barras con color especial para el máximo
   svg.selectAll("rect")
       .data(ventasPorRegion)
       .enter()
       .append("rect")
       .attr("x", d => x(d.region))
-      .attr("y", d => y(d.total))
+      .attr("y", y(0)) // Comienzan en la base
       .attr("width", x.bandwidth())
-      .attr("height", d => height - y(d.total))
-      .attr("fill", "#69b3a2");
+      .attr("height", 0) // Altura inicial 0 para animar
+      .attr("fill", d => d.total === maxTotal ? "#4682B4" : "#69b3a2") // Color oscuro para el máximo
+      .on("mouseover", function(event, d) {
+          if (d.total !== maxTotal) {
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#98c9c1"); // Color más claro al hover
+          }
+      })
+      .on("mouseout", function(event, d) {
+          if (d.total !== maxTotal) {
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#69b3a2"); // Volver a color original
+          }
+      })
+      .transition()
+      .duration(1200)
+      .ease(d3.easeBounceOut)
+      .attr("y", d => y(d.total))
+      .attr("height", d => height - y(d.total));
 
-  // Agregar etiquetas con el valor monetario formateado
-  svg.selectAll(".label")
+  // Agregar etiquetas arriba de cada barra
+  svg.selectAll("text.label")
       .data(ventasPorRegion)
       .enter()
       .append("text")
       .attr("x", d => x(d.region) + x.bandwidth() / 2)
-      .attr("y", d => y(d.total) - 5)
+      .attr("y", y(0) - 5) // Inicialmente en el fondo
       .attr("text-anchor", "middle")
       .style("font-size", "12px")
-      .text(d => `$${formatValue(d.total)}`);
+      .style("opacity", 0)
+      .text(d => `$${formatValue(d.total)}`)
+      .transition()
+      .duration(1200)
+      .delay(400)
+      .ease(d3.easeBounceOut)
+      .attr("y", d => y(d.total) - 5)
+      .style("opacity", 1);
 
   // Título del gráfico
   svg.append("text")
@@ -496,28 +545,30 @@ function generateBarChartSalesByRegion(data) {
 
 
 
-
-
 //función para generar el gráfico de barras de las 5 marcas más vendidas de móviles
 function generateBarChartTopMobilePhones(data) {
   // Filtrar solo productos tipo "Mobile Phone"
   const filtrados = data.filter(d => d.Product === "Mobile Phone");
 
-  // Agrupar por marca y sumar Total_sale (valor total vendido en dinero)
+  // Agrupar por marca y sumar Total_sale
   const ventasPorMarca = d3.rollups(
       filtrados,
-      v => d3.sum(v, d => +d.Total_sale), // ← usamos Total_sale aquí
+      v => d3.sum(v, d => +d.Total_sale),
       d => d.Brand
   ).map(([brand, total]) => ({ brand, total }));
 
   // Ordenar descendente y tomar el top 5
   const top = ventasPorMarca.sort((a, b) => d3.descending(a.total, b.total)).slice(0, 5);
 
-  // Definir dimensiones del SVG
+  // Identificar el máximo total
+  const maxTotal = d3.max(top, d => d.total);
+
+  // Dimensiones del gráfico
   const margin = { top: 50, right: 40, bottom: 40, left: 150 },
         width = 600 - margin.left - margin.right,
         height = top.length * 35;
 
+  // Crear el SVG
   const svg = d3.select("#grafico-top-mobiles")
       .html("")
       .append("svg")
@@ -533,7 +584,7 @@ function generateBarChartTopMobilePhones(data) {
       .padding(0.2);
 
   const x = d3.scaleLinear()
-      .domain([0, d3.max(top, d => d.total)]).nice()
+      .domain([0, maxTotal]).nice()
       .range([0, width]);
 
   // Ejes
@@ -542,7 +593,7 @@ function generateBarChartTopMobilePhones(data) {
       .attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(5));
 
-  // Dibujar barras
+  // Dibujar barras con animación y color especial para el máximo
   svg.selectAll("rect")
       .data(top)
       .enter()
@@ -550,18 +601,45 @@ function generateBarChartTopMobilePhones(data) {
       .attr("y", d => y(d.brand))
       .attr("x", 0)
       .attr("height", y.bandwidth())
-      .attr("width", d => x(d.total))
-      .attr("fill", "#1f77b4");
+      .attr("width", 0) // Inicialmente ancho 0
+      .attr("fill", d => d.total === maxTotal ? "#2f4f4f" : "#1f77b4") // Color oscuro si es máximo
+      .on("mouseover", function(event, d) {
+          if (d.total !== maxTotal) { // Hover solo para los demás
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#4682B4");
+          }
+      })
+      .on("mouseout", function(event, d) {
+          if (d.total !== maxTotal) {
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#1f77b4");
+          }
+      })
+      .transition()
+      .duration(1200)
+      .ease(d3.easeBounceOut)
+      .attr("width", d => x(d.total));
 
-  // Etiquetas de valores monetarios
+  // Etiquetas de valores monetarios con animación
   svg.selectAll("text.label")
       .data(top)
       .enter()
       .append("text")
-      .attr("x", d => x(d.total) + 5)
+      .attr("x", 0) // Comienza en x=0
       .attr("y", d => y(d.brand) + y.bandwidth() / 2 + 5)
-      .text(d => `$${formatValue(d.total)}`) // Muestra el total como dinero
-      .style("font-size", "12px");
+      .text(d => `$${formatValue(d.total)}`)
+      .style("font-size", "12px")
+      .style("opacity", 0)
+      .transition()
+      .duration(1200)
+      .delay(400)
+      .ease(d3.easeBounceOut)
+      .attr("x", d => x(d.total) + 5)
+      .style("opacity", 1);
 
   // Título del gráfico
   svg.append("text")
@@ -576,20 +654,28 @@ function generateBarChartTopMobilePhones(data) {
 
 // funcion para generar el gráfico de barras de las 5 marcas más vendidas de laptops
 function generateBarChartTopLaptops(data) {
+  // Filtrar productos tipo "Laptop"
   const filtrados = data.filter(d => d.Product === "Laptop");
 
+  // Agrupar por marca y sumar Total_sale
   const ventasPorMarca = d3.rollups(
       filtrados,
       v => d3.sum(v, d => +d.Total_sale),
       d => d.Brand
   ).map(([brand, total]) => ({ brand, total }));
 
+  // Ordenar descendente y tomar el top 5
   const top = ventasPorMarca.sort((a, b) => d3.descending(a.total, b.total)).slice(0, 5);
 
+  // Detectar el máximo valor
+  const maxTotal = d3.max(top, d => d.total);
+
+  // Dimensiones
   const margin = { top: 50, right: 40, bottom: 40, left: 150 },
         width = 600 - margin.left - margin.right,
         height = top.length * 35;
 
+  // Crear el SVG
   const svg = d3.select("#grafico-top-laptops")
       .html("")
       .append("svg")
@@ -598,20 +684,23 @@ function generateBarChartTopLaptops(data) {
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
+  // Escalas
   const y = d3.scaleBand()
       .domain(top.map(d => d.brand))
       .range([0, height])
       .padding(0.2);
 
   const x = d3.scaleLinear()
-      .domain([0, d3.max(top, d => d.total)]).nice()
+      .domain([0, maxTotal]).nice()
       .range([0, width]);
 
+  // Ejes
   svg.append("g").call(d3.axisLeft(y));
   svg.append("g")
       .attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(5));
 
+  // Dibujar barras con animación y color especial para la mejor marca
   svg.selectAll("rect")
       .data(top)
       .enter()
@@ -619,18 +708,47 @@ function generateBarChartTopLaptops(data) {
       .attr("y", d => y(d.brand))
       .attr("x", 0)
       .attr("height", y.bandwidth())
-      .attr("width", d => x(d.total))
-      .attr("fill", "#2ca02c");
+      .attr("width", 0) // Empiezan en ancho cero
+      .attr("fill", d => d.total === maxTotal ? "#006400" : "#2ca02c") // Verde oscuro para el máximo
+      .on("mouseover", function(event, d) {
+          if (d.total !== maxTotal) { // Solo barras normales
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#66c266"); // Verde más claro al hover
+          }
+      })
+      .on("mouseout", function(event, d) {
+          if (d.total !== maxTotal) {
+              d3.select(this)
+                  .transition()
+                  .duration(300)
+                  .attr("fill", "#2ca02c"); // Regresar al verde original
+          }
+      })
+      .transition()
+      .duration(1200)
+      .ease(d3.easeBounceOut)
+      .attr("width", d => x(d.total));
 
+  // Etiquetas de valor monetario animadas
   svg.selectAll("text.label")
       .data(top)
       .enter()
       .append("text")
-      .attr("x", d => x(d.total) + 5)
+      .attr("x", 0)
       .attr("y", d => y(d.brand) + y.bandwidth() / 2 + 5)
-      .text(d => `$${formatValue(d.total)}`)// Muestra el total como dinero
-      .style("font-size", "12px");
+      .text(d => `$${formatValue(d.total)}`)
+      .style("font-size", "12px")
+      .style("opacity", 0)
+      .transition()
+      .duration(1200)
+      .delay(400)
+      .ease(d3.easeBounceOut)
+      .attr("x", d => x(d.total) + 5)
+      .style("opacity", 1);
 
+  // Título centrado
   svg.append("text")
       .attr("x", width / 2)
       .attr("y", -20)
@@ -638,7 +756,6 @@ function generateBarChartTopLaptops(data) {
       .style("font-size", "16px")
       .text("Top 5 Marcas Laptop - Total Vendido ($)");
 }
-
 
 
 
